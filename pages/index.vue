@@ -76,6 +76,10 @@ export default Vue.extend({
       generated: []
     }
   },
+  head: {
+    title: 'mpass',
+    link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }]
+  },
   watch: {
     masterpw (val) {
       this.generated.forEach(g => (g.password = this.generatePassword(g.key)))
@@ -138,9 +142,9 @@ export default Vue.extend({
 
       const insert = [
         lowercase[rand(ra, lowercase.length)],
-        uppercase[rand(ra, lowercase.length)],
-        numbers[rand(ra, lowercase.length)],
-        specials[rand(ra, lowercase.length)]
+        uppercase[rand(ra, uppercase.length)],
+        numbers[rand(ra, numbers.length)],
+        specials[rand(ra, specials.length)]
       ].sort((a, b) => rand(ra, 10) - 5).join('')
 
       res = res.substring(0, splitAt) + insert + res.substring(splitAt)
