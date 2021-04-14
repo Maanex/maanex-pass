@@ -2,8 +2,10 @@
   <div class="pass-root bg-gray-800">
     <div class="pass-inner my-48">
       <input ref="area" class="pass-clipboard">
-      <h1 class="mb-5 text-xl font-black text-green-400 font-mono ">
-        pass.maanex.me
+      <h1 class="mb-5 text-xl font-black text-green-400 font-mono flex items-center">
+        <img src="/icon.png" alt="" class="h-4 w-4 mr-2">
+        mpass
+        {{ pwmod ? `— ${pwmod[0]}${pwmod.length%10}` : '' }}
       </h1>
       <input
         v-model="masterpw"
@@ -13,7 +15,7 @@
         @keydown.enter.prevent="poweruser()"
       >
       <div
-        v-for="item of generated"
+        v-for="(item, index) of generated"
         :key="item.key"
         class="w-full py-3 px-3 rounded bg-gray-700 text-gray-100 mb-1 flex cursor-pointer transition-colors hover:bg-gray-600"
         @click="copyToClipboard(item.password || '')+flashMe(item.key)"
@@ -38,15 +40,15 @@
         <div
           class="w-72 h-full bg-gray-900 rounded-sm flex items-center px-3 transition-colors font-mono"
           :flashme="flashes.includes(item.key)"
-          v-text="censorPassword(item.password)"
+          v-text="censorPassword(item.password, index)"
         />
       </div>
       <div
         class="w-full py-3 px-3 rounded border-2 border-dashed border-gray-700 text-gray-100 mb-1 flex cursor-pointer transition-colors text-gray-500 hover:bg-gray-700 hover:text-gray-200"
         @click="addNew()"
       >
-        <span class="font-semibold mr-3 text-inherit">
-          Add
+        <span class="font-semibold mr-3 text-inherit w-full text-center">
+          + Add
         </span>
       </div>
       <div class="pass-spacer" />
@@ -66,12 +68,12 @@
 <script>
 import Vue from 'vue'
 
-const rand = (seed, range) => Math.abs(Math.floor(Math.sin(seed) * range))
-
 export default Vue.extend({
   data () {
     return {
       masterpw: '',
+      pwmod: '',
+      pwmodnum: 0,
       flashes: [],
       generated: []
     }
@@ -82,19 +84,32 @@ export default Vue.extend({
   },
   watch: {
     masterpw (val) {
-      this.generated.forEach(g => (g.password = this.generatePassword(g.key)))
+      this.generated.forEach(g => (g.password = this.generatePassword(g.key, val)))
+    },
+    pwmod (val) {
+      this.pwmodnum = val.split('').reduce((p, c, i) => p + c.charCodeAt(0) * (10 ** i), 0) / (8 ** val.length)
     }
   },
   mounted () {
     const def = '[{"name": "Discord","logo": "discord.com","key": "discord1"},{"name": "Spotify","logo": "spotify.com","key": "spotify"},{"name": "Twitter","logo": "twitter.com","key": "twitter"}]'
     this.generated = JSON.parse(localStorage.getItem('services') || def)
+    this.pwmod = localStorage.getItem('pwmod') || ''
   },
   methods: {
-    censorPassword (password) {
+    rand (seed, range) {
+      return Math.abs(Math.floor(Math.sin(seed + this.pwmodnum) * range))
+    },
+    censorPassword (password, index) {
       if (!password) {
-        return '•'.repeat(rand(Math.random(), 4) + 12)
+        return '•'.repeat(this.rand(Math.random(), 4) + 12)
       }
-      return password[0] + password[1] + '•'.repeat(rand(password.length + password.charCodeAt(4), 4) + 12)
+      if (index <= 1) {
+        return password[0] + password[1] + '•'.repeat(this.rand(password.length + password.charCodeAt(4), 4) + 12)
+      }
+      if (index <= 3) {
+        return password[0] + '•'.repeat(this.rand(password.length + password.charCodeAt(4), 4) + 13)
+      }
+      return '•'.repeat(this.rand(password.length + password.charCodeAt(4), 4) + 14)
     },
     copyToClipboard (text) {
       const area = this.$refs.area
@@ -117,35 +132,38 @@ export default Vue.extend({
       this.generated.splice(this.generated.findIndex(e => e.key === item.key), 1)
       Vue.nextTick(() => this.saveLocalstore())
     },
-    generatePassword (key) {
+    generatePassword (key, password) {
       const lowercase = 'abcdefghijklmnopqrstuvwxyz'
       const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
       const numbers = '0123456789'
       const specials = '-+!?&_'
       const charset = lowercase + lowercase + lowercase + uppercase + uppercase + uppercase + numbers + numbers + numbers + specials
 
+      if (!password) { password = this.masterpw }
+      key += `${password}     `[2] + `${password}     `[3]
+
       let cmaster = 1
       let ckey = 0
 
-      this.masterpw.split('').forEach(a => (cmaster *= a.charCodeAt()))
-      key.split('').forEach(a => (ckey += a.charCodeAt() * cmaster * cmaster))
+      password.split('').forEach(a => (cmaster = cmaster * a.charCodeAt() + 42))
+      key.split('').forEach(a => (ckey += a.charCodeAt() * cmaster * cmaster + ckey * 0.1))
 
       let ra = ckey
-      const length = rand(ra, 2) + 14
-      for (let i = 0; i < 10; i++) { ra = rand(ra, Number.MAX_SAFE_INTEGER) }
+      const length = this.rand(ra, 2) + 14
+      for (let i = 0; i < 10; i++) { ra = this.rand(ra, Number.MAX_SAFE_INTEGER) }
 
       let res = ''
-      for (let i = 0; i < length; i++) { res += charset[rand((ra += rand(ra, Number.MAX_SAFE_INTEGER)), charset.length - 1)] }
+      for (let i = 0; i < length; i++) { res += charset[this.rand((ra += this.rand(ra, Number.MAX_SAFE_INTEGER)), charset.length - 1)] }
 
-      ra = rand(ra, Number.MAX_SAFE_INTEGER)
-      const splitAt = rand(ra, res.length - 3) + 1
+      ra = this.rand(ra, Number.MAX_SAFE_INTEGER)
+      const splitAt = this.rand(ra, res.length - 3) + 1
 
       const insert = [
-        lowercase[rand(ra, lowercase.length)],
-        uppercase[rand(ra, uppercase.length)],
-        numbers[rand(ra, numbers.length)],
-        specials[rand(ra, specials.length)]
-      ].sort((a, b) => rand(ra, 10) - 5).join('')
+        lowercase[this.rand(ra, lowercase.length)],
+        uppercase[this.rand(ra, uppercase.length)],
+        numbers[this.rand(ra, numbers.length)],
+        specials[this.rand(ra, specials.length)]
+      ].sort((a, b) => this.rand(ra, 10) - 5).join('')
 
       res = res.substring(0, splitAt) + insert + res.substring(splitAt)
 
@@ -176,10 +194,34 @@ export default Vue.extend({
       localStorage.setItem('services', JSON.stringify(payload))
     },
     poweruser () {
-      const [cmd, ...args] = this.masterpw.split(' ')
+      const [cmd, ...args] = this.masterpw.toLowerCase().split(' ')
       if (cmd === 'add') {
         const name = args.join(' ')[0].toUpperCase() + args.join(' ').substr(1)
         this.addNew(name, args.join(''), args.join('').toLowerCase() + '.com')
+        this.masterpw = ''
+      } else
+      if (cmd === 'copy') {
+        const key = args[0]
+        const pass = args.slice(1).join(' ')
+        this.copyToClipboard(this.generatePassword(key, pass))
+        this.masterpw = ''
+      } else
+      if (cmd === 'mod') {
+        this.pwmod = args.join(' ')
+        localStorage.setItem('pwmod', args.join(' '))
+        this.masterpw = ''
+      } else
+      if (cmd === 'help') {
+        alert([
+          '▦ add <name>',
+          'quickly add a shortcut to name.com',
+          '',
+          '▦ copy <name> <password>',
+          'quickly copy the password for name to your clipboard. useful if someone is watching and you don\'t want to risk anything.',
+          '',
+          '▦ mod <text>',
+          'add a seed modifier. this modifier is stored in your browser and will change up your results even more. you can take something like your name to get different passwords even if someone picks the same masterpassword as you.'
+        ].join('\n'))
         this.masterpw = ''
       }
     }
